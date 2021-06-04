@@ -19,12 +19,18 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 add_subdirectory(deps)
 include_directories(SYSTEM deps)
+include(CheckFunctionExists)
 
 find_package(Hiredis)
 find_package(PostgreSQL)
 find_package(OpenSSL)
 find_package(libdill REQUIRED)
 find_package(LibUV REQUIRED)
+check_function_exists(vasprintf HAVE_VASPRINTF)
+
+if (HAVE_VASPRINTF)
+  add_definitions(-DHAS_VASPRINTF)
+endif()
 
 include_directories(
     ${HIREDIS_INCLUDE_DIR}

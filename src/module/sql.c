@@ -49,7 +49,9 @@ static void unqueue_query(pq_conn_t* conn, pq_query_t* query);
 static sql_reply_t* wait_reply(pq_query_t* query);
 static void postponed_connect_cb(uv_timer_t* handle);
 static void set_error(const char* err, int copy);
+#ifndef HAS_VASPRINTF
 static int vasprintf(char **strp, const char *fmt, va_list ap);
+#endif /* HAS_VASPRINTF */
 
 int as_sql_module_init(struct appster_module_s* m) {
     vector_setup(remotes, 10, sizeof(void*));
@@ -496,6 +498,7 @@ void set_error(const char* err, int copy) {
         }
     }
 }
+#ifndef HAS_VASPRINTF
 int vasprintf(char **strp, const char *fmt, va_list ap)
 {
     va_list cp;
@@ -518,3 +521,4 @@ int vasprintf(char **strp, const char *fmt, va_list ap)
 
     return vsnprintf(*strp, nb, fmt, ap);
 }
+#endif /* HAS_VASPRINTF */
