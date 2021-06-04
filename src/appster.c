@@ -956,10 +956,14 @@ int write_connection(connection_t *con, evbuffer_t *buf) {
         } else {
             evbuffer_drain(buf, len);
         }
+        /* XXX FIX THIS IS BAD */
+        write_poll(&con->handle, 0, 0);
     } else
-        /* Write to fd */
 #endif
+    {
+        /* Write to fd */
         evbuffer_write(buf, con->fd);
+    }
     return 0;
 }
 int on_parse_error(context_t* ctx) {

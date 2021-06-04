@@ -39,7 +39,9 @@ ssl_ctx_t* crypto_alloc_ctx(crypto_mode_t mode, const char* cert_chain_file, con
     }
 
     SSL_CTX_set_mode(ctx,
-                     SSL_MODE_RELEASE_BUFFERS | SSL_MODE_ENABLE_PARTIAL_WRITE);
+                     SSL_MODE_RELEASE_BUFFERS | SSL_MODE_ENABLE_PARTIAL_WRITE
+                     | SSL_MODE_ASYNC
+    );
 
     SSL_CTX_set_options(ctx,
                         SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE |
