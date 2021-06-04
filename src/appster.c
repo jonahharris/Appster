@@ -256,8 +256,11 @@ int as_listen_and_serve(appster_t* a, const char* addr, uint16_t port, int backl
 
     lassert(a);
 
-    if (uv_ip4_addr(addr, port, ad.sin) != 0 &&
-            uv_ip6_addr(addr, port, ad.sin6) != 0) {
+    if (0 == uv_ip4_addr(addr, port, ad.sin)) {
+        ad.af = AF_INET;
+    } else if (0 == uv_ip6_addr(addr, port, ad.sin6)) {
+        ad.af = AF_INET6;
+    } else {
         ELOG("Failed to parse ip address: %s", addr);
         return -1;
     }
@@ -646,7 +649,7 @@ void bind_listener(uv_loop_t* loop, const addr_t* ad, int backlog) {
 
     a = loop->data;
 
-    fd = socket(AF_INET, SOCK_STREAM, 0);
+    fd = socket(ad->af, SOCK_STREAM, 0);
     if (fd < 0) {
         FLOG("Failed to create TCP socket %s", strerror(errno));
     }
