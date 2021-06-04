@@ -71,7 +71,7 @@ __thread context_t* __current_ctx = NULL;
 #define __AP_PREAMPLE \
     context_t* ctx; \
     appster_t* a; \
-    ctx = parser_get_context(p); \
+    ctx = parser_get_active_context(p); \
     if (ctx->flag.parse_error) { \
         return 0; \
     } \
@@ -111,7 +111,10 @@ static int complete_header(__AP_EVENT_CB);
 static int parse_arguments(context_t* ctx);
 /* Casts and getters */
 static context_t* parser_get_context(http_parser_t* p);
+static context_t* parser_get_active_context(http_parser_t* p);
 
+void run_front_context (http_parser_t *p);
+ 
 static http_parser_settings incoming = {
     on_message_begin,
     on_inc_url,
@@ -560,7 +563,8 @@ void send_reply(context_t* ctx, int status) {
 
     evbuffer_add_printf(buf,
                         "HTTP/1.1 %d %s\r\n"
-                        "Content-Length: %zu\r\n",
+                        "Content-Length: %zu\r\n"
+                        "Connnection: keep-alive\r\n",
                         status, http_status_str(status),
                         ctx->send_body
                             ? evbuffer_get_length(ctx->send_body)
@@ -886,9 +890,14 @@ void write_poll(uv_poll_t* handle, int status, int events) {
         if (!ctx->flag.should_keepalive) {
             uv_close((uv_handle_t*) handle, free_connection);
         } else {
-            uv_poll_start(handle, UV_READABLE, read_poll);
             vector_pop_front(ctx->con->contexts);
             free_context(ctx);
+            if (0 < vector_size(con->contexts)) {
+              run_front_context(con->parser);
+              return;
+            }
+            /* Poll again only when all backlogged requests are complete. */
+            uv_poll_start(handle, UV_READABLE, read_poll);
         }
     }
 }
@@ -1040,7 +1049,7 @@ int on_inc_header_value(__AP_DATA_CB) {
 int on_inc_headers_complete(__AP_EVENT_CB) {
     context_t* ctx;
 
-    ctx = parser_get_context(p);
+    ctx = parser_get_active_context(p);
 
     if (!ctx->flag.parse_error) {
         if (!ctx->flag.parsed_arguments) {
@@ -1071,14 +1080,19 @@ int on_inc_headers_complete(__AP_EVENT_CB) {
         }
     }
 
+#if 0
+    At this point, we've parsed an HTTP message from the socket and should
+    stop polling for input until we've processed the message. We could be
+    processing another message from the buffer, however, which means we're
+    also pending a write - so we can't just stop polling altogether...
     /* stop the connection */
-    uv_poll_stop(&ctx->con->handle);
-
-    __current_ctx = ctx;
+    //uv_poll_stop(&ctx->con->handle);
+    uv_poll_start(&ctx->con->handle, UV_WRITABLE, write_poll);
+#endif
 
     /* execute the concurr callback */
-    if (ctx->handle == -1) {
-        ctx->handle = go(execute_context());
+    if (ctx->handle == -1 && vector_size(ctx->con->contexts)) {
+        run_front_context(p);
     }
 
     return 0;
@@ -1086,7 +1100,7 @@ int on_inc_headers_complete(__AP_EVENT_CB) {
 int on_inc_body(__AP_DATA_CB) {
     context_t* ctx;
 
-    ctx = parser_get_context(p);
+    ctx = parser_get_active_context(p);
 
     if (ctx->flag.parse_error) {
         return 0;
@@ -1182,4 +1196,20 @@ context_t* parser_get_context(http_parser_t* p) {
 
     con = p->data;
     return VECTOR_GET_AS(context_t*, con->contexts, 0);
+}
+context_t* parser_get_active_context(http_parser_t* p) {
+    connection_t* con;
+
+    con = p->data;
+    return *((context_t **) vector_back(con->contexts));
+}
+void
+run_front_context (
+  http_parser_t *p
+) {
+  context_t *ctx = parser_get_context(p);
+  if (ctx->handle == -1) {
+    __current_ctx = ctx;
+    ctx->handle = go(execute_context());
+  }
 }
