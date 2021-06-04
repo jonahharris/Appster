@@ -62,7 +62,9 @@
 //#endif
 
 //#ifdef EVENT__HAVE_SYS_SENDFILE_H
-#include <sys/sendfile.h>
+#ifndef __APPLE__
+# include <sys/sendfile.h>
+#endif /* __APPLE__ */
 //#endif
 //#ifdef EVENT__HAVE_SYS_STAT_H
 #include <sys/stat.h>
