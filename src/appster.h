@@ -32,8 +32,7 @@ typedef struct appster_schema_entry_s {
 
 typedef union appster_channel_u
 {
-    uintptr_t ptr;
-    int id;
+    int ch[2];
 } appster_channel_t;
 
 appster_t* as_alloc(unsigned threads);
@@ -140,8 +139,6 @@ int as_module_init(appster_t* a, as_module_init_cb_t cb);
  */
 appster_channel_t as_channel_alloc();
 void as_channel_free(appster_channel_t ch);
-appster_channel_t as_channel_from_ptr(void* ptr);
-appster_channel_t as_channel_from_int(int i);
 void as_channel_send(appster_channel_t ch, void* what);
 void* as_channel_recv(appster_channel_t ch);
 void* as_channel_pass(appster_channel_t ch);
