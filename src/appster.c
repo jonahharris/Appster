@@ -487,28 +487,19 @@ int as_module_init(appster_t* a, as_module_init_cb_t cb) {
 }
 appster_channel_t as_channel_alloc() {
     appster_channel_t ch;
-    ch.id = chmake(sizeof(void*));
-    if(ch.id == -1) {
+    int rc = chmake(ch.ch);
+    if(rc == -1) {
         perror("Cannot create channel");
         exit(1);
     }
     return ch;
 }
 void as_channel_free(appster_channel_t ch) {
-    hclose(ch.id);
-}
-appster_channel_t as_channel_from_ptr(void* ptr) {
-    appster_channel_t ch;
-    ch.ptr = (uintptr_t) ptr;
-    return ch;
-}
-appster_channel_t as_channel_from_int(int i) {
-    appster_channel_t ch;
-    ch.id = i;
-    return ch;
+    hclose(ch.ch[0]);
+    hclose(ch.ch[1]);
 }
 void as_channel_send(appster_channel_t ch, void* what) {
-    if(chsend(ch.id, &what, sizeof(void*), -1) != 0) {
+    if(chsend(ch.ch[1], &what, sizeof(void*), -1) != 0) {
         perror("Cannot send a message");
         exit(1);
     }
@@ -518,7 +509,7 @@ void* as_channel_recv(appster_channel_t ch) {
     void* rc;
     struct context_s* ctx = __current_ctx;
 
-    if(chrecv(ch.id, &rc, sizeof(void*), -1) != 0) {
+    if(chrecv(ch.ch[0], &rc, sizeof(void*), -1) != 0) {
         perror("Cannot receive message");
         exit(1);
     }
@@ -530,14 +521,14 @@ void* as_channel_recv(appster_channel_t ch) {
 }
 void* as_channel_pass(appster_channel_t ch) {
     void* rc;
-    if(chrecv(ch.id, &rc, sizeof(void*), -1) != 0) {
+    if(chrecv(ch.ch[0], &rc, sizeof(void*), -1) != 0) {
         perror("Cannot receive message");
         exit(1);
     }
     return rc;
 }
 int as_channel_good(appster_channel_t ch) {
-    return ch.id != -1;
+    return (ch.ch[0] != -1 && ch.ch[1] != -1);
 }
 
 void to_lower(char* str) {
@@ -988,7 +979,8 @@ int on_message_begin(__AP_EVENT_CB) {
     ctx->body = evbuffer_new();
     ctx->con = con;
     ctx->handle = -1;
-    ctx->read_ch.id = -1;
+    ctx->read_ch.ch[0] = -1;
+    ctx->read_ch.ch[1] = -1;
 
     vector_push_back(con->contexts, &ctx);
     return 0;
